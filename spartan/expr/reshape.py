@@ -158,7 +158,6 @@ class Reshape(distarray.DistArray):
     base_ravelled_ul, base_ravelled_lr = extent.find_rect(ravelled_ul,
                                                           ravelled_lr,
                                                           self.base.shape)
-    #util.log_info('base_ravelled_ul:%s base_ravelled_lr:%s\n', base_ravelled_ul, base_ravelled_lr)
     base_ul, base_lr = _unravelled_ex(base_ravelled_ul,
                                       base_ravelled_lr,
                                       self.base.shape)
@@ -176,14 +175,13 @@ class Reshape(distarray.DistArray):
       step = self.shape[1] - ex.shape[1]
 
     #util.log_info('step:%s', step)
-
     if not self.base.sparse:
       tile = np.ravel(tile)
       if step == 0:
-        #For continuous data fetch
+	#For continuous data fetch
         tile = tile[(ravelled_ul - base_ravelled_ul):(ravelled_lr - base_ravelled_ul) + 1]
       else:
-        #For segmented data fetch
+	#For segmented data fetch
 	tmp = []
 	#util.log_info('ex.shape: %s self.base.shape:%s self.shape:%s ravelled_ul:%s', ex.shape, self.base.shape, self.shape, ravelled_ul)
 	#util.log_info('for i in xrange(start = %s, stop = %s, step = %s)', ravelled_ul % self.base.shape[1], len(tile), step + ex.shape[1])
