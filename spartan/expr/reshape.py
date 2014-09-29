@@ -170,7 +170,7 @@ class Reshape(distarray.DistArray):
 
     if len(self.shape) == 1 or base_ravelled_ul / self.shape[1] == base_ravelled_lr / self.shape[1]:
     #Case 1: Vector is itself continuous data
-    #Case 2: Result is continuous
+    #Case 2: fetching continuous data
       step = 0
     else:
       step = self.shape[1] - ex.shape[1]
