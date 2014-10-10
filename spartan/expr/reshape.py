@@ -42,6 +42,38 @@ def _tile_mapper(tile_id, blob, array=None, user_fn=None, **kw):
   return user_fn(ex, **kw)
 
 
+def _fetch_subarray(tile, ex_shape, array_shape):
+  '''
+  Fetch a subarray from tile with given shape
+
+  param:
+    1. tile: vector
+          To be noted, we fetch from the first element of this input.
+          Therefore, do remember to set up the value appropriately.
+
+    2. ex_shape: tuple
+          Expected shape of output
+
+    3. array_shape: tuple
+          Array's shape currently
+
+  Return: list
+    Returns array in list data type as expected
+  '''
+  if len(ex_shape) == 1:
+    return tile[:ex_shape[0]].tolist()
+
+  ret = []
+
+  #Compute the distance we need to jump during each recursion
+  step = np.prod(array_shape[1:])
+
+  for i in xrange(ex_shape[0]):
+    ret.append(_fetch_subarray(tile[i*step:], ex_shape[1:], array_shape[1:]))
+
+  return ret
+
+
 class Reshape(distarray.DistArray):
   '''Reshape the underlying array base.
 
@@ -154,44 +186,29 @@ class Reshape(distarray.DistArray):
     #        the base region being fetched is continous. But it is not
     #        true when the `ex` doesn't contain complete rows.
     ravelled_ul, ravelled_lr = _ravelled_ex(ex.ul, ex.lr, self.shape)
-    #util.log_info('ravelled_ul:%s ravelled_lr:%s\n', ravelled_ul, ravelled_lr)
     base_ravelled_ul, base_ravelled_lr = extent.find_rect(ravelled_ul,
                                                           ravelled_lr,
                                                           self.base.shape)
     base_ul, base_lr = _unravelled_ex(base_ravelled_ul,
                                       base_ravelled_lr,
                                       self.base.shape)
-    #util.log_info('base_ul:%s base_lr:%s (%s, %s)\n', base_ul, base_lr, len(base_ul), len(base_lr))
     base_ex = extent.create(base_ul, np.array(base_lr) + 1, self.base.shape)
-    #util.log_info('base_ex: ul%s lr%s\n', base_ex.ul, base_ex.lr)
     tile = self.base.fetch(base_ex)
-    #util.log_info('\n\ntile:\n%s\n', tile)
 
-    if len(self.shape) == 1 or base_ravelled_ul / self.shape[1] == base_ravelled_lr / self.shape[1]:
-    #Case 1: Vector is itself continuous data
-    #Case 2: fetching continuous data
-      step = 0
+    if len(self.shape) == 1 or base_ul[:-1] == base_lr[:-1]:
+      cont = True
     else:
-      step = self.shape[1] - ex.shape[1]
+      cont = False
 
-    #util.log_info('step:%s', step)
     if not self.base.sparse:
       tile = np.ravel(tile)
-      if step == 0:
+      if cont:
 	#For continuous data fetch
         tile = tile[(ravelled_ul - base_ravelled_ul):(ravelled_lr - base_ravelled_ul) + 1]
       else:
 	#For segmented data fetch
-	tmp = []
-	#util.log_info('ex.shape: %s self.base.shape:%s self.shape:%s ravelled_ul:%s', ex.shape, self.base.shape, self.shape, ravelled_ul)
-	#util.log_info('for i in xrange(start = %s, stop = %s, step = %s)', ravelled_ul % self.base.shape[1], len(tile), step + ex.shape[1])
-	start = ravelled_ul % self.base.shape[1]
-	step += ex.shape[1]
-	for i in xrange(ex.shape[0]):
-	  tmp.append(tile[start + (i*step) : (start + (i*step)) + ex.shape[1]].tolist())
-	tile = np.array(tmp)
+        tile = np.array(_fetch_subarray(tile[ravelled_ul - base_ravelled_ul:], ex.shape, self.shape))
 
-      #util.log_info('final:%s', tile)
       assert np.prod(tile.shape) == np.prod(ex.shape), (tile.shape, ex.shape)
 
       return tile.reshape(ex.shape)

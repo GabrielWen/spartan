@@ -134,6 +134,7 @@ class ReshapeTest(test_common.ClusterTest):
     na = n_orig.reshape(8, 3)
     a  = a_orig.reshape((8, 3))
 
+    #Test fetching in complicated ways
     Assert.all_eq(na[:, 1:2], a[:, 1:2].glom())
     Assert.all_eq(na[2:, 1:], a[2:, 1:].glom())
     Assert.all_eq(na[2:6, 2:], a[2:6, 2:].glom())
@@ -141,5 +142,24 @@ class ReshapeTest(test_common.ClusterTest):
     na = n_orig.reshape(6, 4)
     a  = a_orig.reshape((6, 4))
 
+    #Test fetching segmented data with bigger size
     Assert.all_eq(na[:, 2:], a[:, 2:].glom())
     Assert.all_eq(na[:2, 2:], a[:2, 2:].glom())
+
+  def test_colslice_reshape_nd(self):
+    n_orig = np.arange(start = 1, stop = 2017).reshape(7, 9, 4, 8)
+    a_orig = expr.from_numpy(n_orig)
+
+    na = n_orig.reshape(8, 4, 9, 7)
+    a  = a_orig.reshape((8, 4, 9, 7))
+
+    #Test with single array slicing
+    Assert.all_eq(na[:, :, 2:6, :], a[:, :, 2:6, :].glom())
+    Assert.all_eq(na[:, 1:, :, :], a[:, 1:, :, :].glom())
+    Assert.all_eq(na[:, :, :, 2:5], a[:, :, :, 2:5].glom())
+    Assert.all_eq(na[1:5, :, :, :], a[1:5, :, :, :].glom())
+
+    #Test with multiple slicing
+    Assert.all_eq(na[:, 1:, 2:6, :], a[:, 1:, 2:6, :].glom())
+    Assert.all_eq(na[1:5, 1:, 2:6, :], a[1:5, 1:, 2:6, :].glom())
+    Assert.all_eq(na[1:5, 1:, 2:6, 2:5], a[1:5, 1:, 2:6, 2:5].glom())
