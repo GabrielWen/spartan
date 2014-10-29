@@ -286,6 +286,31 @@ class DistArrayImpl(DistArray):
                    mapper_fn = _tile_mapper,
                    kw=kw)
 
+  def col_fetch(self, subslices):
+    util.log_info('\n\nsubslices:%s %s', type(subslices), subslices)
+    #Assert.isinstance(subslices, tuple)
+    util.log_info('self.shape: %s', self.shape)
+    util.log_info('self.tiles: %s', self.tiles)
+
+    ctx = blob_ctx.get()
+
+    #TODO: Overlapping func
+    splits = dict()
+    offset = 0
+
+    for ex in self.tiles.iterkeys():
+      tile_id = self.tiles[ex]
+      if not tile_id in splits.keys():
+        splits[tile_id] = []
+
+      splits[tile_id].append(extent.find_overlapping_col(self.shape, ex, subslices))
+      util.log_info('%s: %s', tile_id, splits[tile_id])
+
+    util.log_info('\n\nsplits: %s', splits)
+    #TODO: Reducing func
+
+    return 0
+
   def fetch(self, region):
     '''
     Return a local numpy array for the given region.
@@ -299,9 +324,10 @@ class DistArrayImpl(DistArray):
     assert np.all(region.lr <= self.shape), 'Requested region is out of bounds: %s > %s' % (region, self.shape)
     #util.log_info('FETCH: %s %s', self.shape, region)
 
+    util.log_info('region: %s %s %s', region.ul, region.lr, type(region.ul))
+
     ctx = blob_ctx.get()
    
-    
     # special case exact match against a tile 
     if region in self.tiles:
       #util.log_warn('Exact match.')
@@ -313,12 +339,14 @@ class DistArrayImpl(DistArray):
     #util.log_warn('Remote fetch.')
     splits = list(extent.find_overlapping(self.tiles.iterkeys(), region))
 
+    util.log_info('splits:%s', splits)
     #util.log_info('Target shape: %s, %d splits', region.shape, len(splits))
     #util.log_info('Fetching %d tiles', len(splits))
 
     futures = []
     for ex, intersection in splits:
       tile_id = self.tiles[ex]
+      util.log_info('offet_slice:%s', extent.offset_slice(ex, intersection))
       futures.append(ctx.get(tile_id, extent.offset_slice(ex, intersection), wait=False))
     
     # stitch results back together
@@ -359,7 +387,6 @@ class DistArrayImpl(DistArray):
           tgt = sparse.compute_sparse_update(tgt, result, dst_slice)
         else:
           tgt[dst_slice] = result
-
 
     return tgt
     #return tile.data[]

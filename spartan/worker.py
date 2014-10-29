@@ -192,11 +192,12 @@ class Worker(object):
     :param handle: `PendingRequest`
     
     '''
+    util.log_info('req:%s', type(req))
     if req.subslice is None:
-      #util.log_info('GET: %s', type(self._blobs[req.id]))
       resp = core.GetResp(data=self._blobs[req.id])
       handle.done(resp)
     else:
+      util.log_info('GET: slice %s', req.subslice)
       resp = core.GetResp(data=self._blobs[req.id].get(req.subslice))
       handle.done(resp)
 
