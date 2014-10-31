@@ -275,6 +275,9 @@ def find_overlapping_col(shape, extent, subslices):
   '''
   ret = []
 
+  if not type(subslices) == list:
+    subslices = [subslices]
+
   #util.log_info('shape: %s', shape)
   #util.log_info('extent: %s %s', extent.ul, extent.lr)
   #util.log_info('subslices: %s', subslices)
@@ -297,7 +300,7 @@ def find_overlapping_col(shape, extent, subslices):
       for idx in xrange(start, stop, step+seg):
         b = min(a+step, subslice.stop, stop)
         if a >= b:  break
-        tmp.append((a, slice(a-idx, b-idx, None)))
+        tmp.append((a, slice(a-start, b-start, None)))
         a += step+seg
       if len(tmp) > 0:
         ret.append(tmp)

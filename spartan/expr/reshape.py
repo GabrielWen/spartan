@@ -221,13 +221,16 @@ class Reshape(distarray.DistArray):
     '''
     Handler for fetch of segmented data
     '''
-    ravelled_subslice = []
-    start, stop = _ravelled_ex(ex.ul, ex.lr, self.shape)
+    if isinstance(ex, extent.TileExtent):
+      start, stop = _ravelled_ex(ex.ul, ex.lr, self.shape)
+      ravelled_subslice = _colfetch_slice(start, ex.shape, self.shape)
+    else:
+      ravelled_subslice = ex
 
-    ravelled_subslice = _colfetch_slice(start, ex.shape, self.shape)
-    ravelled_subslice = [x for x in util.flatten_list(ravelled_subslice, slice)]
+    if isinstance(ravelled_subslice, list):
+      ravelled_subslice = [x for x in util.flatten_list(ravelled_subslice, slice)]
 
-    return self.base.col_fetch(ravelled_subslice).reshape(ex.shape)
+    return self.base.col_fetch(ravelled_subslice)
 
   def fetch(self, ex):
     if self.is_add_dimension:
@@ -264,8 +267,6 @@ class Reshape(distarray.DistArray):
         tile = np.array(_fetch_subarray(tile[ravelled_ul - base_ravelled_ul:], ex.shape, self.shape))
 
       assert np.prod(tile.shape) == np.prod(ex.shape), (tile.shape, ex.shape)
-
-      Assert.all_eq(tile.reshape(ex.shape), self.col_fetch(ex))
 
       return tile.reshape(ex.shape)
     else:
