@@ -29,7 +29,7 @@ class TestTile(test_common.ClusterTest):
     t = tile.from_shape(ARRAY_SIZE, dtype=np.float32, tile_type=tile.TYPE_DENSE)
     update = np.ones(UPDATE_SHAPE)
     t.update(UPDATE_SUBSLICE, update, None)
-    print t.data
+    util.log_info('\n%s', t.data)
     
   def test_update_dense_to_sparse(self):
     t = tile.from_shape(ARRAY_SIZE, dtype=np.float32, tile_type=tile.TYPE_SPARSE)

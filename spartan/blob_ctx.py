@@ -124,7 +124,7 @@ class BlobCtx(object):
     '''
     return self.destroy_all([tile_id])
 
-  def get(self, tile_id, subslice, wait=True, timeout=None):
+  def get(self, tile_id, subslice, wait=True, timeout=None, seg=False):
     '''
     Fetch a region of a tile.
     
@@ -133,14 +133,20 @@ class BlobCtx(object):
       subslice (slice or None): Portion of tile to fetch.
       wait (boolean): Wait for this operation to finish before returning.
       timeout (float):
+      seg: Token to identify if we are fetching from segmented data
     '''
     Assert.isinstance(tile_id, core.TileId)
     req = core.GetReq(id=tile_id, subslice=subslice)
 
-    if wait:
-      return self._send(tile_id, 'get', req, wait=True, timeout=timeout).data
+    if seg:
+      method = 'get_seg'
     else:
-      return self._send(tile_id, 'get', req, wait=False)
+      method = 'get'
+
+    if wait:
+      return self._send(tile_id, method, req, wait=True, timeout=timeout).data
+    else:
+      return self._send(tile_id, method, req, wait=False)
 
   def get_flatten(self, tile_id, subslice, wait=True, timeout=None):
     '''

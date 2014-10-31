@@ -66,10 +66,16 @@ class Tile(object):
     #util.log_info('Update: %s %s', subslice, data)
     return merge(self, subslice, data, reducer)
 
-  def get_slice(self, subslice=None):
+  def get_seg(self, subslices=None):
     '''
     This is a generalized func for sliced distArray fetch
     '''
+    data = np.ravel(self.data)
+
+    ret = []
+
+    for order, subslice in subslices:
+      ret.append((order, data[subslice]))
     #XXX: No data
 
     #XXX: scaler case
@@ -78,7 +84,7 @@ class Tile(object):
 
     #XXX: dense array case
 
-    return 0
+    return ret
 
   def get(self, subslice=None):
     # no data, return an empty array
@@ -100,7 +106,6 @@ class Tile(object):
     Assert.le(len(subslice), len(self.data.shape),
               'Selector has more dimensions than data! %s %s' % (subslice, self.data.shape))
 
-    util.log_info('subslice: %s', subslice)
     # otherwise if sparse, return a sparse subset
     if self.type == TYPE_SPARSE:
       if subslice is None or extent.is_complete(self.data.shape, subslice):

@@ -276,7 +276,7 @@ def find_overlapping_col(shape, extent, subslices):
   ret = []
 
   #util.log_info('shape: %s', shape)
-  util.log_info('extent: %s %s', extent.ul, extent.lr)
+  #util.log_info('extent: %s %s', extent.ul, extent.lr)
   #util.log_info('subslices: %s', subslices)
 
   start = ravelled_pos(extent.ul, shape)
@@ -285,12 +285,6 @@ def find_overlapping_col(shape, extent, subslices):
   step = extent.lr[-1] - extent.ul[-1]
   #Length of discontinous data per
   seg = shape[-1] - step
-  
-
-  #util.log_info('start: %s', start)
-  #util.log_info('stop: %s', stop)
-  #util.log_info('step: %s', step)
-  #util.log_info('seg: %s', seg)
 
   for subslice in subslices:
     tmp = []
@@ -299,22 +293,28 @@ def find_overlapping_col(shape, extent, subslices):
     if not (subslice.stop <= start or subslice.start >= stop):
       #Make subslice aligned with extent
       a = max(subslice.start, start)
-      #util.log_info('max of a: %s', a)
-      #util.log_info('ROUNDDOWN: %s', ROUNDDOWN(a-start, step+seg) + start)
       a = ROUNDUP(a-start, step+seg) + start if ROUNDDOWN(a-start, step+seg) + start + step <= a else a
-      #util.log_info('if of a: %s', a)
       for idx in xrange(start, stop, step+seg):
         b = min(a+step, subslice.stop, stop)
         if a >= b:  break
-        tmp.append(slice(a, b, None))
+        tmp.append((a, slice(a-idx, b-idx, None)))
         a += step+seg
-      #util.log_info('tmp: %s', tmp)
       if len(tmp) > 0:
         ret.append(tmp)
 
-  util.log_info('ret: %s', ret)
+  return ret
+
+def sort_array(unordered):
+  '''
+  Sort fetched and unordered array into ordered vector
+  '''
+  ret = np.ndarray((0), dtype = int)
+
+  for i in sorted(unordered, key = lambda lis: lis[0]):
+    ret = np.append(ret, i[1])
 
   return ret
+
 
 def compute_slice(TileExtent base, idx):
   '''Return a new ``TileExtent`` representing ``base[idx]``

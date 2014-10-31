@@ -192,13 +192,25 @@ class Worker(object):
     :param handle: `PendingRequest`
     
     '''
-    util.log_info('req:%s', type(req))
     if req.subslice is None:
       resp = core.GetResp(data=self._blobs[req.id])
       handle.done(resp)
     else:
-      util.log_info('GET: slice %s', req.subslice)
       resp = core.GetResp(data=self._blobs[req.id].get(req.subslice))
+      handle.done(resp)
+
+  def get_seg(self, req, handle):
+    '''
+    Fetch a protion of a tile with segmented data
+
+    :param req: 'GetReq'
+    :param handle: 'PendingRequest'
+    '''
+    if req.subslice is None:
+      resp = core.GetResp(data=self._blobs[req.id])
+      handle.done(resp)
+    else:
+      resp = core.GetResp(data=self._blobs[req.id].get_seg(req.subslice))
       handle.done(resp)
 
   def get_flatten(self, req, handle):
@@ -210,7 +222,6 @@ class Worker(object):
     
     '''
     if req.subslice is None:
-      #util.log_info('GET: %s', type(self._blobs[req.id]))
       resp = core.GetResp(data=self._blobs[req.id].data.flatten())
       handle.done(resp)
     else:

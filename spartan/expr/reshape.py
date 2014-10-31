@@ -73,6 +73,48 @@ def _fetch_subarray(tile, ex_shape, array_shape):
 
   return ret
 
+def _colfetch_slice(start, ex_shape, array_shape):
+  '''
+  Compute slices this fetch needs
+
+  param:
+    1. start: int
+	  Starting point of slices
+
+    2. ex_shape: tuple
+	  Expected shape of output
+
+    3. array_shape: tuple
+	  Array's shape currently
+
+  Return: list
+    Returns a list that contains slices this fetch
+    operation needs
+  '''
+  if len(ex_shape) == 1:
+    return slice(start, start + ex_shape[0], None)
+
+  ret = []
+
+  step = np.prod(array_shape[1:])
+
+  for i in xrange(ex_shape[0]):
+    ret.append(_colfetch_slice(start + (i*step), ex_shape[1:], array_shape[1:]))
+
+  return ret
+
+def flatten_list(lis):
+  '''
+  Flatten list of lists into a single list of slices
+  '''
+  import collections
+
+  for el in lis:
+    if isinstance(el, collections.Iterable) and not isinstance(el, slice):
+      for sub in flatten_list(el):
+        yield sub
+    else:
+      yield el
 
 class Reshape(distarray.DistArray):
   '''Reshape the underlying array base.
@@ -175,6 +217,18 @@ class Reshape(distarray.DistArray):
                                                   self.shape)
     return extent.create(unravelled_ul, np.array(unravelled_lr) + 1, self.shape)
 
+  def col_fetch(self, ex):
+    '''
+    Handler for fetch of segmented data
+    '''
+    ravelled_subslice = []
+    start, stop = _ravelled_ex(ex.ul, ex.lr, self.shape)
+
+    ravelled_subslice = _colfetch_slice(start, ex.shape, self.shape)
+    ravelled_subslice = [x for x in util.flatten_list(ravelled_subslice, slice)]
+
+    return self.base.col_fetch(ravelled_subslice).reshape(ex.shape)
+
   def fetch(self, ex):
     if self.is_add_dimension:
       ul = ex.ul[0:self.new_dimension_idx] + ex.ul[self.new_dimension_idx + 1:]
@@ -210,6 +264,8 @@ class Reshape(distarray.DistArray):
         tile = np.array(_fetch_subarray(tile[ravelled_ul - base_ravelled_ul:], ex.shape, self.shape))
 
       assert np.prod(tile.shape) == np.prod(ex.shape), (tile.shape, ex.shape)
+
+      Assert.all_eq(tile.reshape(ex.shape), self.col_fetch(ex))
 
       return tile.reshape(ex.shape)
     else:
