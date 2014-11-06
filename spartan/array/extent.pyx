@@ -5,6 +5,7 @@ from spartan import util
 from spartan.util import Assert
 import numpy as np
 import math
+import time
 cimport numpy as np
 
 cimport cython
@@ -265,7 +266,7 @@ def ROUNDDOWN(val, scaler):
 def ROUNDUP(val, scaler):
   return 0 if val == 0 else (int(val / scaler) + 1) * scaler
 
-def find_overlapping_col(shape, extent, subslices):
+cpdef find_overlapping_col(shape, extent, subslices):
   '''
   Return extent's ravelled slices that overlap with subslice
 
@@ -273,6 +274,8 @@ def find_overlapping_col(shape, extent, subslices):
   :param extents: 'Extent' for mapping
   :param subslices: subslices we are mapping with
   '''
+  time_start = time.time()
+
   ret = []
 
   if not type(subslices) == list:
@@ -303,18 +306,28 @@ def find_overlapping_col(shape, extent, subslices):
         tmp.append((a, slice(a-start, b-start, None)))
         a += step+seg
       if len(tmp) > 0:
-        ret.append(tmp)
+        ret.extend(tmp)
+
+  util.log_info('find_overlapping: %s', time.time() - time_start)
 
   return ret
 
-def sort_array(unordered):
+def ordering(x, y):
+  return x[0] - y[0]
+
+cpdef sort_array(unordered):
   '''
   Sort fetched and unordered array into ordered vector
   '''
+  time_start = time.time()
   ret = np.ndarray((0), dtype = int)
 
-  for i in sorted(unordered, key = lambda lis: lis[0]):
+  unordered.sort(cmp = ordering)
+
+  for i in unordered:
     ret = np.append(ret, i[1])
+
+  util.log_info('sort_array: %s', time.time() - time_start)
 
   return ret
 

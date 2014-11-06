@@ -494,21 +494,3 @@ class FileHelper(object):
   def __exit__(self, exc_type, exc_val, exc_tb):
     for v in self._files.values():
      v.close()
-
-def flatten_list(lis, tp):
-  '''
-  Flatten list of lists into a single list of designated type
-
-  :param lis
-    list to be sorted
-  :param tp
-    type designated
-
-  Return: flattened list
-  '''
-  for el in lis:
-    if isinstance(el, collections.Iterable) and not isinstance(el, tp):
-      for sub in flatten_list(el, tp):
-        yield sub
-    else:
-      yield el

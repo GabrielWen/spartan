@@ -13,7 +13,7 @@ from ..array import extent, distarray
 from ..core import LocalKernelResult
 from .shuffle import target_mapper
 from traits.api import PythonValue, Instance, Tuple
-
+import time
 
 def _ravelled_ex(ul, lr, shape):
   ravelled_ul = extent.ravelled_pos(ul, shape)
@@ -92,29 +92,16 @@ def _colfetch_slice(start, ex_shape, array_shape):
     operation needs
   '''
   if len(ex_shape) == 1:
-    return slice(start, start + ex_shape[0], None)
+    return [slice(start, start + ex_shape[0], None)]
 
   ret = []
 
   step = np.prod(array_shape[1:])
 
   for i in xrange(ex_shape[0]):
-    ret.append(_colfetch_slice(start + (i*step), ex_shape[1:], array_shape[1:]))
+    ret.extend(_colfetch_slice(start + (i*step), ex_shape[1:], array_shape[1:]))
 
   return ret
-
-def flatten_list(lis):
-  '''
-  Flatten list of lists into a single list of slices
-  '''
-  import collections
-
-  for el in lis:
-    if isinstance(el, collections.Iterable) and not isinstance(el, slice):
-      for sub in flatten_list(el):
-        yield sub
-    else:
-      yield el
 
 class Reshape(distarray.DistArray):
   '''Reshape the underlying array base.
@@ -221,18 +208,27 @@ class Reshape(distarray.DistArray):
     '''
     Handler for fetch of segmented data
     '''
+    util.log_info('Evaluating Column Fetch: %s', ex)
     if isinstance(ex, extent.TileExtent):
       start, stop = _ravelled_ex(ex.ul, ex.lr, self.shape)
+      time_start = time.time()
       ravelled_subslice = _colfetch_slice(start, ex.shape, self.shape)
+      util.log_info('\nTIME _colfetch_slice: %s\n', time.time() - time_start)
     else:
       ravelled_subslice = ex
 
-    if isinstance(ravelled_subslice, list):
-      ravelled_subslice = [x for x in util.flatten_list(ravelled_subslice, slice)]
+    #if isinstance(ravelled_subslice, list):
+    #  time_start = time.time()
+    #  ravelled_subslice = [x for x in util.flatten_list(ravelled_subslice, slice)]
+    #  util.log_info('\nTIME util.flatten_list: %s\n', time.time() - time_start)
 
-    return self.base.col_fetch(ravelled_subslice)
+    return self.base.col_fetch(ravelled_subslice).reshape(ex.shape)
 
-  def fetch(self, ex):
+  def fetch(self, ex, seg = False):
+    if seg:
+      return self.col_fetch(ex)
+
+    util.log_info('Evaluating regular fetch: %s', ex)
     if self.is_add_dimension:
       ul = ex.ul[0:self.new_dimension_idx] + ex.ul[self.new_dimension_idx + 1:]
       lr = ex.lr[0:self.new_dimension_idx] + ex.lr[self.new_dimension_idx + 1:]

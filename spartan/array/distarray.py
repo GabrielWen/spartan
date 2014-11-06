@@ -15,6 +15,8 @@ from ..util import Assert
 from ..config import FLAGS
 from .. import master
 
+import time
+
 # number of elements per tile
 DEFAULT_TILE_SIZE = 100000
 
@@ -168,7 +170,7 @@ class DistArray(object):
       value = a_value
     self.update(ex, value)
 
-  def select(self, idx):
+  def select(self, idx, seg=False):
     '''
     Effectively __getitem__.
 
@@ -185,14 +187,14 @@ class DistArray(object):
 
     ex = extent.from_slice(idx, self.shape)
     #util.log_info('Select: %s + %s -> %s', idx, self.shape, ex)
-    return self.fetch(ex)
+    return self.fetch(ex, seg)
 
   def __getitem__(self, idx):
     return self.select(idx)
     
-  def glom(self):
+  def glom(self, seg=False):
     #util.log_info('Glomming: %s', self.shape)
-    return self.select(np.index_exp[:])
+    return self.select(np.index_exp[:], seg)
 
   def map_to_array(self, mapper_fn, kw=None):
     results = self.foreach_tile(mapper_fn=mapper_fn, kw=kw)
@@ -291,6 +293,8 @@ class DistArrayImpl(DistArray):
     splits = dict()
     offset = 0
 
+    time_start = time.time()
+    
     for ex in self.tiles.iterkeys():
       tile_id = self.tiles[ex]
 
@@ -298,18 +302,29 @@ class DistArrayImpl(DistArray):
       if len(slices) > 0:
         if not tile_id in splits.keys():
           splits[tile_id] = []
+        splits[tile_id].extend(slices)
 
-        splits[tile_id].append(slices)
+    util.log_info('find_overlapping_col as whole: %s', time.time() - time_start)
 
     ctx = blob_ctx.get()
 
     futures = []
+
+    time_start = time.time()
+
     for tile_id in splits.iterkeys():
-      futures.append(ctx.get(tile_id, [x for x in util.flatten_list(splits[tile_id], tuple)], wait=False, seg=True))
+      futures.append(ctx.get(tile_id, splits[tile_id], wait=False, seg=True))
 
-    results = [r.data for r in rpc.wait_for_all(futures)]
+    util.log_info('futures.append as whole: %s', time.time() - time_start)
+    time_start = time.time()
 
-    ret = extent.sort_array([x for x in util.flatten_list(results, tuple)])
+    results = []
+
+    for r in rpc.wait_for_all(futures):
+      results.extend(r.data)
+
+    util.log_info('rpc.wait_for_all as whole: %s', time.time() - time_start)
+    ret = extent.sort_array(results)
 
     return ret
 
