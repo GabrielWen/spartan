@@ -92,7 +92,7 @@ def notarget_mapper(ex, array=None, map_fn=None, source=None, fn_kw=None):
       result_tile = tile.from_data(v)
       tile_id = blob_ctx.get().create(result_tile).wait().tile_id
       results.append((ex, tile_id))
-  
+
   return LocalKernelResult(result=results, futures=None)
 
 

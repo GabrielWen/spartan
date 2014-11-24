@@ -111,7 +111,6 @@ def _tile_mapper(tile_id, blob, array=None, user_fn=None, **kw):
   ex = array.extent_for_blob(tile_id)
   return user_fn(ex, **kw)
 
-
 class DistArray(object):
   '''The interface required for distributed arrays.
   
@@ -122,7 +121,7 @@ class DistArray(object):
      * ``foreach_tile(fn, kw)``
   '''
 
-  def fetch(self, ex):
+  def fetch(self, ex, seg = False):
     '''Fetch the region specified by extent from this array.
     
     Args:
@@ -288,6 +287,14 @@ class DistArrayImpl(DistArray):
                    mapper_fn = _tile_mapper,
                    kw=kw)
 
+  def fetch_to_new(self, ex, new_shape):
+    '''
+    Special fetch method for Reshape's data copy
+    IMPORTANT: This method assumes same tiling strategy!!
+    '''
+    ctx = blob_ctx.get()
+    return 0
+
   def col_fetch(self, subslices):
     ctx = blob_ctx.get()
     splits = dict()
@@ -328,7 +335,7 @@ class DistArrayImpl(DistArray):
 
     return ret
 
-  def fetch(self, region):
+  def fetch(self, region, seg = False):
     '''
     Return a local numpy array for the given region.
     
@@ -614,7 +621,7 @@ class LocalWrapper(DistArray):
   def extent_for_blob(self, tile_id):
     return self._ex
 
-  def fetch(self, ex):
+  def fetch(self, ex, seg = False):
     return self._data[ex.to_slice()]
 
   def map_to_array(self, mapper_fn, kw=None):

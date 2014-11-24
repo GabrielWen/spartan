@@ -79,9 +79,9 @@ class Slice(distarray.DistArray):
     base_ex = self.base.blob_to_ex[id]
     return extent.intersection(self.slice, base_ex)
  
-  def fetch(self, idx):
+  def fetch(self, idx, seg = False):
     offset = extent.compute_slice(self.slice, idx.to_slice())
-    return self.base.fetch(offset)
+    return self.base.fetch(offset, seg)
 
 
 class SliceExpr(base.Expr):

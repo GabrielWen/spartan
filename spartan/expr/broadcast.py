@@ -90,7 +90,7 @@ class Broadcast(distarray.DistArray):
 
     return extent.create(ul, lr, self.base.shape)
 
-  def fetch(self, ex):
+  def fetch(self, ex, seg = False):
     # make a template to pass to numpy broadcasting
     template = np.ndarray(ex.shape, dtype=self.base.dtype)
 

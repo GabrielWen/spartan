@@ -54,9 +54,9 @@ class Transpose(distarray.DistArray):
     base_ex = self.base.blob_to_ex[id]
     return extent.create(base_ex.ul[::-1], base_ex.lr[::-1], self.base.shape)
   
-  def fetch(self, ex):
+  def fetch(self, ex, seg = False):
     base_ex = extent.create(ex.ul[::-1], ex.lr[::-1], self.base.shape)
-    base_tile = self.base.fetch(base_ex)
+    base_tile = self.base.fetch(base_ex, seg)
     return base_tile.transpose()
 
 class TransposeExpr(Expr):

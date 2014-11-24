@@ -229,6 +229,7 @@ class Reshape(distarray.DistArray):
       return self.col_fetch(ex)
 
     util.log_info('Evaluating regular fetch: %s', ex)
+    util.log_info(' _tile_shape: %s', self._tile_shape)
     if self.is_add_dimension:
       ul = ex.ul[0:self.new_dimension_idx] + ex.ul[self.new_dimension_idx + 1:]
       lr = ex.lr[0:self.new_dimension_idx] + ex.lr[self.new_dimension_idx + 1:]
