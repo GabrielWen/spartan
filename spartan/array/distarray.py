@@ -70,7 +70,7 @@ def compute_splits(shape, tile_hint):
 
 def compute_extents(shape, tile_hint=None, num_shards=-1):
   '''Split an array of shape ``shape`` into `Extent`s. Each extent contains roughly `TILE_SIZE` elements if num_shards is -1.
- 
+
   Args:
     shape: tuple. the array's shape.
     tile_hint: tuple indicating the desired tile shape.
@@ -99,11 +99,12 @@ def compute_extents(shape, tile_hint=None, num_shards=-1):
   for slc in itertools.product(*splits):
     if num_shards != -1:
       idx = idx % num_shards
-      
+
     ul, lr = zip(*slc)
     ex = extent.create(ul, lr, shape)
     result[ex] = idx
     idx += 1
+
   return result
 
 def _tile_mapper(tile_id, blob, array=None, user_fn=None, **kw):
@@ -113,9 +114,9 @@ def _tile_mapper(tile_id, blob, array=None, user_fn=None, **kw):
 
 class DistArray(object):
   '''The interface required for distributed arrays.
-  
+
   A distributed array should support:
-  
+
      * ``fetch(ex)`` to fetch data
      * ``update(ex, data)`` to combine an update with existing data
      * ``foreach_tile(fn, kw)``
@@ -123,19 +124,19 @@ class DistArray(object):
 
   def fetch(self, ex, seg = False):
     '''Fetch the region specified by extent from this array.
-    
+
     Args:
       ex (Extent): Region to fetch
-    
+
     Returns:
       np.ndarray: Data from region.
-    
+
     '''
     raise NotImplementedError
 
   def update(self, ex, data):
     raise NotImplementedError
-  
+
   def foreach_tile(self, mapper_fn, kw):
     raise NotImplementedError
 
@@ -156,7 +157,7 @@ class DistArray(object):
 
   def __repr__(self):
     return '%s(id=%s, shape=%s, dtype=%s)' % (self.__class__.__name__, id(self), self.shape, self.dtype)
-  
+
   def __setitem__(self, idx, value):
     if np.isscalar(idx):
       result = self.select(slice(idx, idx + 1))
@@ -190,7 +191,6 @@ class DistArray(object):
 
   def __getitem__(self, idx):
     return self.select(idx)
-    
   def glom(self, seg=False):
     #util.log_info('Glomming: %s', self.shape)
     return self.select(np.index_exp[:], seg)
@@ -202,10 +202,10 @@ class DistArray(object):
       for ex, id in d:
         extents[ex] = id
     return from_table(extents)
- 
+
   def __hash__(self):
     return id(self)
- 
+
   @property
   def ndim(self):
     return len(self.shape)
@@ -225,7 +225,7 @@ class DistArrayImpl(DistArray):
     self.sparse = sparse
     self.bad_tiles = []
     self.ctx = blob_ctx.get()
-    
+
     Assert.not_null(dtype)
 
     Assert.isinstance(tiles, dict)
@@ -268,12 +268,12 @@ class DistArrayImpl(DistArray):
 
   def extent_for_blob(self, id):
     return self.blob_to_ex[id]
-  
+
   def tile_shape(self):
     scounts = collections.defaultdict(int)
     for ex in self.tiles.iterkeys():
       scounts[ex.shape] += 1
-    
+
     return sorted(scounts.items(), key=lambda kv: (kv[1], kv[0]))[-1][0]
 
   def foreach_tile(self, mapper_fn, kw=None):
@@ -338,8 +338,8 @@ class DistArrayImpl(DistArray):
   def fetch(self, region, seg = False):
     '''
     Return a local numpy array for the given region.
-    
-    If necessary, data will be copied from remote hosts to fill the region.    
+
+    If necessary, data will be copied from remote hosts to fill the region.
     :param region: `Extent` indicating the region to fetch.
     '''
     Assert.isinstance(region, extent.TileExtent)
@@ -349,7 +349,6 @@ class DistArrayImpl(DistArray):
     #util.log_info('FETCH: %s %s', self.shape, region)
 
     ctx = blob_ctx.get()
-   
     # special case exact match against a tile 
     if region in self.tiles:
       #util.log_warn('Exact match.')
@@ -357,7 +356,7 @@ class DistArrayImpl(DistArray):
       tile_id = self.tiles[region]
       tgt = ctx.get(tile_id, extent.offset_slice(ex, intersection))
       return tgt
-    
+
     #util.log_warn('Remote fetch.')
     splits = list(extent.find_overlapping(self.tiles.iterkeys(), region))
 
@@ -368,27 +367,26 @@ class DistArrayImpl(DistArray):
     for ex, intersection in splits:
       tile_id = self.tiles[ex]
       futures.append(ctx.get(tile_id, extent.offset_slice(ex, intersection), wait=False))
-   
     # stitch results back together
     # if we have any masked tiles, then we need to create a masked array.
     # otherwise, create a dense array.
     results = [r.data for r in rpc.wait_for_all(futures)]
-   
+
     DENSE = 0
     MASKED = 1
     SPARSE = 2
-    
+
     # If there is only one slice, no need to do copy
     if len(splits) == 1:
       return results[0]
 
     output_type = DENSE
     for r in results:
-      if isinstance(r, np.ma.MaskedArray) and output_type == DENSE: 
+      if isinstance(r, np.ma.MaskedArray) and output_type == DENSE:
         output_type = MASKED
       if scipy.sparse.issparse(r):
         output_type = SPARSE
-   
+
     if output_type == MASKED:
       tgt = np.ma.MaskedArray(np.ndarray(region.shape, dtype=self.dtype))
       tgt.mask = 0
@@ -397,7 +395,7 @@ class DistArrayImpl(DistArray):
       tgt = sparse.convert_sparse_array(tgt)
     else:
       tgt = np.ndarray(region.shape, dtype=self.dtype)
-    
+
     for (ex, intersection), result in zip(splits, results):
       dst_slice = extent.offset_slice(region, intersection)
       #util.log_info('ex:%s region:%s intersection:%s dst_slice:%s result:%s', ex, region, intersection, dst_slice, result)
@@ -409,11 +407,10 @@ class DistArrayImpl(DistArray):
           tgt[dst_slice] = result
 
     return tgt
-    #return tile.data[]
-   
+
   def update_slice(self, slc, data):
     return self.update(extent.from_slice(slc, self.shape), data)
-     
+
   def update(self, region, data, wait=True):
     ctx = blob_ctx.get()
     Assert.isinstance(region, extent.TileExtent)
@@ -426,40 +423,40 @@ class DistArrayImpl(DistArray):
       dst_slice = extent.offset_slice(region, region)
       #util.log_info('EXACT: %s %s ', region, dst_slice)
       return ctx.update(tile_id, dst_slice, data, self.reducer_fn, wait=wait)
-    
-    
+
+
     futures = []
     slices = []
-    
+
     if region.shape == self.shape:
       for ex, tile_id in self.tiles.iteritems():
         slices.append((tile_id, ex.to_slice(), extent.offset_slice(ex, ex)))
     else:
       splits = list(extent.find_overlapping(self.tiles, region))
       #util.log_info('%s: Updating %s tiles with data:%s', region, len(splits), data)
-      
+
       for dst_extent, intersection in splits:
         #util.log_info('%s %s %s', region, dst_extent, intersection)
-  
+
         tile_id = self.tiles[dst_extent]
-  
+
         src_slice = extent.offset_slice(region, intersection)
         dst_slice = extent.offset_slice(dst_extent, intersection)
-     
+
         shape = [slice.stop - slice.start for slice in dst_slice]
         if extent.all_nonzero_shape(shape):
           slices.append((tile_id, src_slice, dst_slice))
         #util.log_info('Update src:%s dst:%s data shape:%s', src_slice, dst_slice, data.shape)
-    
+
     slices.sort(key=lambda x: x[1][0].start)
     #util.log_info("Update: slices:%s", slices)
     result = sparse.multiple_slice(data, slices)
-    
+
     for (tile_id, dst_slice, update_data) in result:
       futures.append(ctx.update(tile_id,
-                                dst_slice, 
-                                update_data, 
-                                self.reducer_fn, 
+                                dst_slice,
+                                update_data,
+                                self.reducer_fn,
                                 wait=False))
 
     if wait:
@@ -481,15 +478,15 @@ def create(shape,
   extents = compute_extents(shape, tile_hint, ctx.num_workers)
   tiles = {}
   tile_type = tile.TYPE_SPARSE if sparse else tile.TYPE_DENSE
-  
+
   if FLAGS.tile_assignment_strategy == 'round_robin':
-    for ex, i in extents.iteritems():    
+    for ex, i in extents.iteritems():
       tiles[ex] = ctx.create(
-                    tile.from_shape(ex.shape, dtype, tile_type=tile_type), 
+                    tile.from_shape(ex.shape, dtype, tile_type=tile_type),
                     hint=i)
   elif FLAGS.tile_assignment_strategy == 'performance':
     worker_scores = master.get().get_worker_scores()
-    for ex, i in extents.iteritems():    
+    for ex, i in extents.iteritems():
       tiles[ex] = ctx.create(
                   tile.from_shape(ex.shape, dtype, tile_type=tile_type),
                   hint=worker_scores[i%len(worker_scores)][0])
@@ -518,13 +515,13 @@ def create(shape,
   else: #random
     for ex in extents:
       tiles[ex] = ctx.create(tile.from_shape(ex.shape, dtype, tile_type=tile_type))
-      
+
   for ex in extents:
     tiles[ex] = tiles[ex].wait().tile_id
 
   #for ex, i in extents.iteritems():
   #  util.log_warn("i:%d ex:%s, tile_id:%s", i, ex, tiles[ex])
-    
+
   array = DistArrayImpl(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer, sparse=sparse)
   master.get().register_array(array)
   return array
@@ -544,16 +541,16 @@ def from_replica(X):
       worker_to_tiles[tile_id.worker] = [ex]
     else:
       worker_to_tiles[tile_id.worker].append(ex)
-  
+
   for worker_id, ex_list in worker_to_tiles.iteritems():
     for ex in ex_list:
       tiles[ex] = ctx.create(
-                  tile.from_shape(ex.shape, dtype, tile_type=tile_type), 
+                  tile.from_shape(ex.shape, dtype, tile_type=tile_type),
                   hint=worker_id+1)
-      
+
   for ex in tiles:
     tiles[ex] = tiles[ex].wait().tile_id
-    
+
   array = DistArrayImpl(shape=shape, dtype=dtype, tiles=tiles, reducer_fn=reducer, sparse=sparse)
   master.get().register_array(array)
   return array
@@ -562,31 +559,31 @@ def from_table(extents):
   '''
   Construct a distarray from an existing table.
   Keys must be of type `Extent`, values of type `Tile`.
-  
+
   Shape is computed as the maximum range of all extents.
-  
+
   Dtype is taken from the dtype of the tiles.
-  
+
   :param table:
   '''
   Assert.no_duplicates(extents)
-  
+
   if not extents:
     shape = tuple()
   else:
     shape = extent.find_shape(extents.keys())
-  
+
   if len(extents) > 0:
     # fetch one tile from the table to figure out the dtype
     key, tile_id = extents.iteritems().next()
     util.log_debug('%s :: %s', key, tile_id)
-    
+
     dtype, sparse = blob_ctx.get().tile_op(tile_id, lambda t: (t.dtype, t.type == tile.TYPE_SPARSE)).result
   else:
     # empty table; default dtype.
     dtype = np.float
     sparse = False
-  
+
   array = DistArrayImpl(shape=shape, dtype=dtype, tiles=extents, reducer_fn=None, sparse=sparse)
   master.get().register_array(array)
   return array
@@ -600,7 +597,7 @@ class LocalWrapper(DistArray):
     self.sparse = False
     self.bad_tiles = []
     self._ex = extent.from_slice(np.index_exp[:], self.shape)
-    Assert.isinstance(data, (np.ndarray, int, float))
+    Assert.isinstance(data, (np.ndarray, int, long, float))
     #print 'Wrapping: %s %s (%s)' % (data, type(data), np.isscalar(data))
     #print 'DATA: %s' % type(self._data)
 
@@ -632,24 +629,24 @@ class LocalWrapper(DistArray):
     if kw is None: kw = {}
     map_result = mapper_fn(self._ex, **kw)
     result = map_result.result
-    
+
     assert len(result) == 1
     result_ex, tile_id = result[0]
-    
+
     Assert.isinstance(tile_id, core.TileId)
     ctx = blob_ctx.get()
-    
+
     result_data = ctx.get(tile_id, slice(None, None, None))
     return as_array(result_data)
 
 
-def as_array(data): 
+def as_array(data):
   '''
   Convert ``data`` to behave like a `DistArray`.
-  
+
   If ``data`` is already a `DistArray`, it is returned unchanged.
   Otherwise, ``data`` is wrapped to have a `DistArray` interface.
-  
+
   :param data: An input array or array-like value.
   '''
   if isinstance(data, DistArray):
@@ -669,16 +666,16 @@ def best_locality(array, ex):
   for key, overlap in splits:
     shard = array.extents[key]
     counts[shard] += overlap.size
-  
+
   s_counts = sorted(counts.items(), key=lambda kv: kv[1])
   return s_counts[-1][0]
-  
+
 
 def largest_value(vals):
   '''
   Return the largest array (using the underlying size for Broadcast objects).
-  
-  :param vals: List of `DistArray`. 
+
+  :param vals: List of `DistArray`.
   '''
   return max(vals, key=lambda v: v.real_size())
 
