@@ -225,9 +225,6 @@ class Reshape(distarray.DistArray):
     return self.base.col_fetch(ravelled_subslice).reshape(ex.shape)
 
   def fetch(self, ex, seg = False):
-    if seg:
-      return self.col_fetch(ex)
-
     util.log_info('Evaluating regular fetch: %s', ex)
     util.log_info(' _tile_shape: %s', self._tile_shape)
     if self.is_add_dimension:
@@ -247,12 +244,23 @@ class Reshape(distarray.DistArray):
                                       base_ravelled_lr,
                                       self.base.shape)
     base_ex = extent.create(base_ul, np.array(base_lr) + 1, self.base.shape)
-    tile = self.base.fetch(base_ex)
 
+    util.log_info('self.base: tile_hint: %s shape: %s', self.base.tile_shape(), self.base.shape)
+
+    util.log_info('base.shape: %s', self.base.tile_shape())
+
+    new_shape = [1]
+    new_shape.extend(list(self.base.shape[1:]))
+
+    util.log_info('self.base: %s => %s', self.base, tuple(new_shape))
+
+    tile = self.base.fetch(base_ex)
+    
     if len(self.shape) == 1 or base_ul[:-1] == base_lr[:-1]:
       cont = True
     else:
       cont = False
+    
 
     if not self.base.sparse:
       tile = np.ravel(tile)
@@ -292,6 +300,10 @@ class ReshapeExpr(Expr):
   def _evaluate(self, ctx, deps):
     v = deps['array']
     shape = deps['new_shape']
+
+    test = retile(v, (1, 8))
+    util.log_info('test: %s %s', type(test), v)
+
     return Reshape(v, shape, self.tile_hint)
 
   def compute_shape(self):

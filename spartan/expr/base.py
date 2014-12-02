@@ -277,6 +277,7 @@ class Expr(Node):
     #util.log_info('Evaluting deps for %s', prim)
     deps = {}
     for k, vs in self.dependencies().iteritems():
+    #XXX: Add condition to handle ReshapeExpr
       if isinstance(vs, Expr):
         deps[k] = vs.evaluate()
       else:
@@ -461,6 +462,7 @@ class Expr(Node):
 
   def force(self):
     'Evaluate this expression (and all dependencies).'
+    util.log_info('force: %s', type(self))
     return self.evaluate()
     #return self.optimized().evaluate()
 
