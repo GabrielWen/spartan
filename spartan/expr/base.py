@@ -277,7 +277,6 @@ class Expr(Node):
     #util.log_info('Evaluting deps for %s', prim)
     deps = {}
     for k, vs in self.dependencies().iteritems():
-    #XXX: Add condition to handle ReshapeExpr
       if isinstance(vs, Expr):
         deps[k] = vs.evaluate()
       else:
@@ -401,7 +400,7 @@ class Expr(Node):
             del_dim.append(x)
 
       if isinstance(idx, int) or is_del_dim or (isinstance(idx, tuple) and (newaxis in idx)):
-	#The shape has to be updated
+	      #The shape has to be updated
         if isinstance(idx, tuple):
           new_shape = tuple([slice(x, None, None) if x == -1 else x for x in idx if not x == newaxis])
         else:
@@ -426,7 +425,7 @@ class Expr(Node):
         if is_del_dim:
           for i in del_dim:
             new_shape.pop(i)
-        return ReshapeExpr(array=ret, new_shape=new_shape)
+        return ReshapeExpr(array=ret, new_shape=new_shape, dimension_update=True)
       else:
         #This means it's just a simple slice op
         return SliceExpr(src=self, idx=idx)

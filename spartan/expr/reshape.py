@@ -15,6 +15,8 @@ from .shuffle import target_mapper
 from traits.api import PythonValue, Instance, Tuple
 import time
 
+from .retile import retile as retile_force
+
 def _ravelled_ex(ul, lr, shape):
   ravelled_ul = extent.ravelled_pos(ul, shape)
   ravelled_lr = extent.ravelled_pos([l - 1 for l in lr], shape)
@@ -225,8 +227,6 @@ class Reshape(distarray.DistArray):
     return self.base.col_fetch(ravelled_subslice).reshape(ex.shape)
 
   def fetch(self, ex, seg = False):
-    util.log_info('Evaluating regular fetch: %s', ex)
-    util.log_info(' _tile_shape: %s', self._tile_shape)
     if self.is_add_dimension:
       ul = ex.ul[0:self.new_dimension_idx] + ex.ul[self.new_dimension_idx + 1:]
       lr = ex.lr[0:self.new_dimension_idx] + ex.lr[self.new_dimension_idx + 1:]
@@ -293,6 +293,7 @@ class ReshapeExpr(Expr):
   array = Instance(Expr)
   new_shape = Tuple
   tile_hint = PythonValue(None, desc="None or Tuple")
+  dimension_update = False
 
   def __str__(self):
     return 'Reshape[%d] %s to %s' % (self.expr_id, self.array, self.new_shape)
@@ -300,9 +301,15 @@ class ReshapeExpr(Expr):
   def _evaluate(self, ctx, deps):
     v = deps['array']
     shape = deps['new_shape']
+    
+    util.log_info('v: %s %s -> %s', v, v.shape, self.new_shape)
 
-    test = retile(v, (1, 8))
-    util.log_info('test: %s %s', type(test), v)
+    util.log_info('dimension_update: %s', self.dimension_update)
+
+    if not self.dimension_update and len(v.shape) > 1 and not np.prod(v.tile_shape()[1:]) == np.prod(v.shape[1:]):
+      util.log_info('retiling...')
+      new_tile = [v.shape[0] / blob_ctx.get().num_workers] + list(v.shape[1:])
+      v = retile_force(v, tuple(new_tile)).force()
 
     return Reshape(v, shape, self.tile_hint)
 

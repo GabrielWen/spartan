@@ -43,7 +43,6 @@ from .retile import retile
 from .transpose import transpose
 from .dot import dot
 from .sort import sort, argsort, argpartition
-from .copy import copy
 
 Expr.outer = outer
 Expr.sum = sum
