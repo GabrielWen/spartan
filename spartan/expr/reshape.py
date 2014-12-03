@@ -307,8 +307,7 @@ class ReshapeExpr(Expr):
     util.log_info('dimension_update: %s', self.dimension_update)
 
     if not self.dimension_update and len(v.shape) > 1 and not np.prod(v.tile_shape()[1:]) == np.prod(v.shape[1:]):
-      util.log_info('retiling...')
-      new_tile = [v.shape[0] / blob_ctx.get().num_workers] + list(v.shape[1:])
+      new_tile = [v.shape[0] / blob_ctx.get().num_workers + 1] + list(v.shape[1:])
       v = retile_force(v, tuple(new_tile)).force()
 
     return Reshape(v, shape, self.tile_hint)
